@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee List</title>
+
+    <!-- Apply saved theme before paint to avoid a flash of the wrong theme -->
+    <script>
+        (function () {
+            var saved = localStorage.getItem('employee-theme');
+            var prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+            if (saved === 'light' || (!saved && prefersLight)) {
+                document.documentElement.classList.add('light');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind (JIT, no build step needed) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <!-- Typefaces: Space Grotesk for display, Inter for body, JetBrains Mono for tabular data -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        display: ['"Space Grotesk"', 'sans-serif'],
+                        body: ['Inter', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    <style>
+        :root {
+            --bg: #0b1020;
+            --text: #f1f5f9;
+            --muted: #94a3b8;
+            --glass-bg: rgba(255, 255, 255, 0.06);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --glass-strong-bg: rgba(255, 255, 255, 0.09);
+            --glass-strong-border: rgba(255, 255, 255, 0.16);
+            --hairline: rgba(255, 255, 255, 0.08);
+            --hover-bg: rgba(255, 255, 255, 0.10);
+            --input-bg: rgba(255, 255, 255, 0.05);
+            --input-border: rgba(255, 255, 255, 0.14);
+            --placeholder: rgba(148, 163, 184, 0.6);
+            --aurora-opacity: 0.55;
+            --aurora-mid-opacity: 0.35;
+        }
+        html.light {
+            --bg: #e9edf5;
+            --text: #0f172a;
+            --muted: #55617a;
+            --glass-bg: rgba(255, 255, 255, 0.55);
+            --glass-border: rgba(15, 23, 42, 0.10);
+            --glass-strong-bg: rgba(255, 255, 255, 0.72);
+            --glass-strong-border: rgba(15, 23, 42, 0.12);
+            --hairline: rgba(15, 23, 42, 0.08);
+            --hover-bg: rgba(15, 23, 42, 0.05);
+            --input-bg: rgba(255, 255, 255, 0.7);
+            --input-border: rgba(15, 23, 42, 0.14);
+            --placeholder: rgba(71, 85, 105, 0.55);
+            --aurora-opacity: 0.28;
+            --aurora-mid-opacity: 0.18;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--text);
+            position: relative;
+            overflow-x: hidden;
+            transition: background 0.25s ease, color 0.25s ease;
+        }
+
+        /* Aurora / mesh backdrop */
+        .aurora { position: fixed; inset: 0; z-index: 0; overflow: hidden; }
+        .aurora::before, .aurora::after {
+            content: "";
+            position: absolute;
+            width: 60vw; height: 60vw;
+            border-radius: 9999px;
+            filter: blur(110px);
+            opacity: var(--aurora-opacity);
+            animation: drift 22s ease-in-out infinite alternate;
+        }
+        .aurora::before {
+            top: -15%; left: -10%;
+            background: radial-gradient(circle at 30% 30%, #38bdf8, transparent 70%);
+        }
+        .aurora::after {
+            bottom: -20%; right: -10%;
+            background: radial-gradient(circle at 70% 70%, #a78bfa, transparent 70%);
+            animation-delay: -11s;
+        }
+        .aurora .mid {
+            position: absolute; top: 30%; left: 40%;
+            width: 45vw; height: 45vw;
+            border-radius: 9999px;
+            filter: blur(120px);
+            opacity: var(--aurora-mid-opacity);
+            background: radial-gradient(circle, #34d399, transparent 70%);
+            animation: drift 28s ease-in-out infinite alternate-reverse;
+        }
+        @keyframes drift {
+            0%   { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(4%, 6%) scale(1.08); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .aurora::before, .aurora::after, .aurora .mid { animation: none; }
+        }
+
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+        }
+        .glass-strong {
+            background: var(--glass-strong-bg);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--glass-strong-border);
+        }
+        .row-hover:hover { background: var(--hover-bg); }
+        .hairline-b { border-bottom: 1px solid var(--hairline); }
+
+        ::-webkit-scrollbar { height: 8px; width: 8px; }
+        ::-webkit-scrollbar-thumb { background: var(--hover-bg); border-radius: 9999px; }
+
+        .sort-link:hover .sort-icon { color: #38bdf8; }
+
+        .avatar-badge {
+            width: 2rem; height: 2rem; border-radius: 9999px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 11px; font-weight: 600; flex-shrink: 0;
+            border: 1px solid var(--glass-border);
+        }
+        .avatar-0 { background: linear-gradient(135deg, rgba(56,189,248,.35), rgba(103,232,249,.35)); color: #e0f2fe; }
+        .avatar-1 { background: linear-gradient(135deg, rgba(167,139,250,.35), rgba(232,121,249,.35)); color: #f3e8ff; }
+        .avatar-2 { background: linear-gradient(135deg, rgba(52,211,153,.35), rgba(45,212,191,.35)); color: #d1fae5; }
+        .avatar-3 { background: linear-gradient(135deg, rgba(251,191,36,.35), rgba(251,146,60,.35)); color: #fef3c7; }
+        .avatar-4 { background: linear-gradient(135deg, rgba(251,113,133,.35), rgba(244,114,182,.35)); color: #ffe4e6; }
+
+        .toast { transition: opacity 0.3s ease, transform 0.3s ease; }
+        .toast.toast-hide { opacity: 0; transform: translate(-50%, -12px); }
+    </style>
+</head>
+<body class="font-body">
+
+<div class="aurora"><span class="mid"></span></div>
+
+<!--
+  Flash message support: from your controller, before redirecting to this page, set
+    redirectAttributes.addFlashAttribute("successMessage", "Employee added.");
+  or
+    redirectAttributes.addFlashAttribute("errorMessage", "Could not delete employee.");
+  These blocks render only when the corresponding attribute is present.
+-->
+<div th:if="${successMessage} != null" id="toast-success" data-toast
+     class="toast fixed top-6 left-1/2 -translate-x-1/2 z-50 glass-strong rounded-xl px-4 py-3 flex items-center gap-3 shadow-2xl shadow-black/20 max-w-md w-[90%]" role="status">
+    <i class="fa-solid fa-circle-check text-emerald-400"></i>
+    <span class="text-sm" th:text="${successMessage}"></span>
+    <button type="button" onclick="dismissToast('toast-success')" class="ml-auto shrink-0 text-[var(--muted)] hover:text-[var(--text)] transition-colors">
+        <i class="fa-solid fa-xmark text-xs"></i>
+    </button>
+</div>
+<div th:if="${errorMessage} != null" id="toast-error" data-toast
+     class="toast fixed top-6 left-1/2 -translate-x-1/2 z-50 glass-strong rounded-xl px-4 py-3 flex items-center gap-3 shadow-2xl shadow-black/20 max-w-md w-[90%]" role="alert">
+    <i class="fa-solid fa-triangle-exclamation text-rose-400"></i>
+    <span class="text-sm" th:text="${errorMessage}"></span>
+    <button type="button" onclick="dismissToast('toast-error')" class="ml-auto shrink-0 text-[var(--muted)] hover:text-[var(--text)] transition-colors">
+        <i class="fa-solid fa-xmark text-xs"></i>
+    </button>
+</div>
+
+<main class="relative z-10 max-w-7xl mx-auto px-6 py-10 md:py-14">
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+        <div class="flex items-center gap-4">
+            <div class="glass w-12 h-12 rounded-2xl flex items-center justify-center shrink-0">
+                <i class="fa-solid fa-users text-sky-400 text-lg"></i>
+            </div>
+            <div>
+                <h1 class="font-display text-2xl md:text-3xl font-semibold tracking-tight">Employee Management</h1>
+                <p class="text-sm text-[var(--muted)] mt-0.5">View, search, and manage your team's records</p>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <button type="button" onclick="toggleTheme()" title="Toggle theme"
+                    class="w-11 h-11 shrink-0 inline-flex items-center justify-center rounded-xl glass text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--hover-bg)] transition-colors">
+                <i id="theme-icon" class="fa-solid fa-sun text-sm"></i>
+            </button>
+            <a th:href="@{/employees/new}"
+               class="inline-flex items-center gap-2 rounded-xl px-5 py-3 font-medium text-slate-950 bg-gradient-to-r from-sky-400 to-cyan-300 hover:from-sky-300 hover:to-cyan-200 transition-colors shadow-lg shadow-sky-500/20 w-fit">
+                <i class="fa-solid fa-user-plus text-sm"></i>
+                <span>Add New Employee</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Table card -->
+    <div class="glass-strong rounded-2xl shadow-2xl shadow-black/20 overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse min-w-[820px]">
+                <thead>
+                <tr class="hairline-b">
+                    <th class="px-6 py-4">
+                        <a th:href="@{/employees(page=0, size=${size}, sortField='id', sortDirection=${sortField == 'id' ? reverseSortDirection : 'asc'}, search=${search})}"
+                           class="sort-link inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)] hover:text-[var(--text)] transition-colors">
+                            <span>ID</span>
+                            <i class="sort-icon fa-solid text-[11px] text-[var(--muted)]"
+                               th:classappend="${sortField == 'id'} ? (${sortDirection == 'asc'} ? 'fa-sort-up text-sky-400' : 'fa-sort-down text-sky-400') : 'fa-sort'"></i>
+                        </a>
+                    </th>
+                    <th class="px-6 py-4">
+                        <a th:href="@{/employees(page=0, size=${size}, sortField='name', sortDirection=${sortField == 'name' ? reverseSortDirection : 'asc'}, search=${search})}"
+                           class="sort-link inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)] hover:text-[var(--text)] transition-colors">
+                            <span>Name</span>
+                            <i class="sort-icon fa-solid text-[11px] text-[var(--muted)]"
+                               th:classappend="${sortField == 'name'} ? (${sortDirection == 'asc'} ? 'fa-sort-up text-sky-400' : 'fa-sort-down text-sky-400') : 'fa-sort'"></i>
+                        </a>
+                    </th>
+                    <th class="px-6 py-4">
+                        <a th:href="@{/employees(page=0, size=${size}, sortField='email', sortDirection=${sortField == 'email' ? reverseSortDirection : 'asc'}, search=${search})}"
+                           class="sort-link inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)] hover:text-[var(--text)] transition-colors">
+                            <i class="fa-regular fa-envelope text-[11px] text-[var(--muted)]"></i>
+                            <span>Email</span>
+                            <i class="sort-icon fa-solid text-[11px] text-[var(--muted)]"
+                               th:classappend="${sortField == 'email'} ? (${sortDirection == 'asc'} ? 'fa-sort-up text-sky-400' : 'fa-sort-down text-sky-400') : 'fa-sort'"></i>
+                        </a>
+                    </th>
+                    <th class="px-6 py-4">
+                        <span class="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">
+                            <i class="fa-solid fa-phone text-[11px] text-[var(--muted)]"></i>
+                            <span>Number</span>
+                        </span>
+                    </th>
+                    <th class="px-6 py-4">
+                        <a th:href="@{/employees(page=0, size=${size}, sortField='salary', sortDirection=${sortField == 'salary' ? reverseSortDirection : 'asc'}, search=${search})}"
+                           class="sort-link inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)] hover:text-[var(--text)] transition-colors">
+                            <i class="fa-solid fa-sack-dollar text-[11px] text-[var(--muted)]"></i>
+                            <span>Salary</span>
+                            <i class="sort-icon fa-solid text-[11px] text-[var(--muted)]"
+                               th:classappend="${sortField == 'salary'} ? (${sortDirection == 'asc'} ? 'fa-sort-up text-sky-400' : 'fa-sort-down text-sky-400') : 'fa-sort'"></i>
+                        </a>
+                    </th>
+                    <th class="px-6 py-4 text-right">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-[var(--muted)]">Actions</span>
+                    </th>
+                </tr>
+                </thead>
+
+                <tbody>
+                <tr th:each="employee : ${employees}"
+                    th:with="parts=${#strings.arraySplit(employee.name, ' ')},
+                             initials=${#strings.toUpperCase(#strings.substring(parts[0],0,1) + (parts.length > 1 ? #strings.substring(parts[parts.length - 1],0,1) : ''))},
+                             colorIdx=${T(java.lang.Math).abs(employee.name.hashCode()) % 5}"
+                    class="row-hover hairline-b last:border-b-0 transition-colors">
+                    <td class="px-6 py-4 font-mono text-sm text-[var(--muted)]" th:text="${employee.id}"></td>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center gap-3">
+                            <div class="avatar-badge" th:classappend="'avatar-' + ${colorIdx}">
+                                <span th:text="${initials}"></span>
+                            </div>
+                            <span class="font-medium" th:text="${employee.name}"></span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-[var(--muted)]" th:text="${employee.email}"></td>
+                    <td class="px-6 py-4 font-mono text-sm text-[var(--muted)]" th:text="${employee.number}"></td>
+                    <td class="px-6 py-4 font-mono text-sm text-emerald-400" th:text="${employee.salary}"></td>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center justify-end gap-2">
+                            <a th:href="@{/employees/edit/{id}(id=${employee.id})}"
+                               title="Edit employee"
+                               class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 hover:bg-emerald-500/25 transition-colors">
+                                <i class="fa-solid fa-pen text-xs"></i>
+                            </a>
+                            <a th:href="@{/employees/delete/{id}(id=${employee.id})}"
+                               onclick="return confirm('Are you sure you want to delete this employee?');"
+                               title="Delete employee"
+                               class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-rose-500/15 text-rose-500 border border-rose-500/30 hover:bg-rose-500/25 transition-colors">
+                                <i class="fa-solid fa-trash text-xs"></i>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+
+                <tr th:if="${#lists.isEmpty(employees)}">
+                    <td colspan="6" class="px-6 py-16 text-center">
+                        <div class="flex flex-col items-center gap-3 text-[var(--muted)]">
+                            <i class="fa-solid fa-user-slash text-2xl"></i>
+                            <span>No employees found.</span>
+                        </div>
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Footer: info / pagination / search -->
+    <div class="mt-6 grid grid-cols-1 lg:grid-cols-3 items-center gap-4">
+
+        <div class="text-sm text-[var(--muted)] order-2 lg:order-1 text-center lg:text-left">
+            Page <span class="text-[var(--text)] font-medium" th:text="${currentPage + 1}"></span> of
+            <span class="text-[var(--text)] font-medium" th:text="${totalPages}"></span>
+            <span class="opacity-60">&middot;</span>
+            <span th:text="${totalItems}"></span> total employees
+        </div>
+
+        <div class="flex items-center justify-center gap-1.5 order-1 lg:order-2">
+            <a th:if="${currentPage > 0}"
+               th:href="@{/employees(page=${currentPage - 1}, size=${size}, sortField=${sortField}, sortDirection=${sortDirection}, search=${search})}"
+               class="w-9 h-9 inline-flex items-center justify-center rounded-lg glass text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--hover-bg)] transition-colors">
+                <i class="fa-solid fa-chevron-left text-xs"></i>
+            </a>
+            <span th:if="${currentPage == 0}" class="w-9 h-9 inline-flex items-center justify-center rounded-lg glass text-[var(--muted)] opacity-40">
+                <i class="fa-solid fa-chevron-left text-xs"></i>
+            </span>
+
+            <span th:each="i : ${#numbers.sequence(0, totalPages - 1)}">
+                <a th:if="${i != currentPage}"
+                   th:href="@{/employees(page=${i}, size=${size}, sortField=${sortField}, sortDirection=${sortDirection}, search=${search})}"
+                   th:text="${i + 1}"
+                   class="min-w-[36px] h-9 px-2 inline-flex items-center justify-center rounded-lg glass text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--hover-bg)] transition-colors text-sm"></a>
+                <span th:if="${i == currentPage}"
+                      th:text="${i + 1}"
+                      class="min-w-[36px] h-9 px-2 inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-sky-400 to-cyan-300 text-slate-950 font-semibold text-sm shadow-md shadow-sky-500/30"></span>
+            </span>
+
+            <a th:if="${currentPage + 1 < totalPages}"
+               th:href="@{/employees(page=${currentPage + 1}, size=${size}, sortField=${sortField}, sortDirection=${sortDirection}, search=${search})}"
+               class="w-9 h-9 inline-flex items-center justify-center rounded-lg glass text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--hover-bg)] transition-colors">
+                <i class="fa-solid fa-chevron-right text-xs"></i>
+            </a>
+            <span th:if="${currentPage + 1 >= totalPages}" class="w-9 h-9 inline-flex items-center justify-center rounded-lg glass text-[var(--muted)] opacity-40">
+                <i class="fa-solid fa-chevron-right text-xs"></i>
+            </span>
+        </div>
+
+        <div class="flex justify-center lg:justify-end order-3">
+            <form th:action="@{/employees}" method="get" class="glass rounded-xl flex items-center gap-1 p-1.5 w-full max-w-sm">
+                <input type="hidden" name="sortField" th:value="${sortField}" />
+                <input type="hidden" name="sortDirection" th:value="${sortDirection}" />
+                <input type="hidden" name="size" th:value="${size}" />
+
+                <i class="fa-solid fa-magnifying-glass text-[var(--muted)] text-xs ml-2.5 shrink-0"></i>
+                <input type="text" name="search" placeholder="Search by name, email, number..."
+                       th:value="${search}"
+                       class="bg-transparent border-0 focus:ring-0 focus:outline-none text-sm w-full px-2 py-1.5" style="color: var(--text);" />
+
+                <a th:if="${search != null and !search.isEmpty()}" th:href="@{/employees}"
+                   title="Clear search"
+                   class="w-7 h-7 inline-flex items-center justify-center rounded-md text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--hover-bg)] transition-colors shrink-0">
+                    <i class="fa-solid fa-xmark text-xs"></i>
+                </a>
+
+                <button type="submit"
+                        class="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-sm font-medium text-slate-950 bg-gradient-to-r from-sky-400 to-cyan-300 hover:from-sky-300 hover:to-cyan-200 transition-colors shrink-0">
+                    Search
+                </button>
+            </form>
+        </div>
+
+    </div>
+
+</main>
+
+<script>
+    function toggleTheme() {
+        var isLight = document.documentElement.classList.toggle('light');
+        localStorage.setItem('employee-theme', isLight ? 'light' : 'dark');
+        document.getElementById('theme-icon').className = isLight ? 'fa-solid fa-moon text-sm' : 'fa-solid fa-sun text-sm';
+    }
+    // Sync the icon with whatever theme the head script already applied.
+    document.getElementById('theme-icon').className = document.documentElement.classList.contains('light')
+        ? 'fa-solid fa-moon text-sm' : 'fa-solid fa-sun text-sm';
+
+    function dismissToast(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.classList.add('toast-hide');
+        setTimeout(function () { el.remove(); }, 300);
+    }
+    document.querySelectorAll('[data-toast]').forEach(function (el) {
+        setTimeout(function () { dismissToast(el.id); }, 4000);
+    });
+</script>
+</body>
+</html>

@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title th:text="${employee.id} != null ? 'Edit Employee' : 'Add Employee'"></title>
+
+    <!-- Apply saved theme before paint to avoid a flash of the wrong theme -->
+    <script>
+        (function () {
+            var saved = localStorage.getItem('employee-theme');
+            var prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+            if (saved === 'light' || (!saved && prefersLight)) {
+                document.documentElement.classList.add('light');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind (JIT, no build step needed) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <!-- Typefaces: Space Grotesk for display, Inter for body, JetBrains Mono for numeric fields -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        display: ['"Space Grotesk"', 'sans-serif'],
+                        body: ['Inter', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    <style>
+        :root {
+            --bg: #0b1020;
+            --text: #f1f5f9;
+            --muted: #94a3b8;
+            --glass-bg: rgba(255, 255, 255, 0.06);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --glass-strong-bg: rgba(255, 255, 255, 0.09);
+            --glass-strong-border: rgba(255, 255, 255, 0.16);
+            --hover-bg: rgba(255, 255, 255, 0.10);
+            --input-bg: rgba(255, 255, 255, 0.05);
+            --input-border: rgba(255, 255, 255, 0.14);
+            --placeholder: rgba(148, 163, 184, 0.6);
+            --aurora-opacity: 0.55;
+            --aurora-mid-opacity: 0.35;
+        }
+        html.light {
+            --bg: #e9edf5;
+            --text: #0f172a;
+            --muted: #55617a;
+            --glass-bg: rgba(255, 255, 255, 0.55);
+            --glass-border: rgba(15, 23, 42, 0.10);
+            --glass-strong-bg: rgba(255, 255, 255, 0.72);
+            --glass-strong-border: rgba(15, 23, 42, 0.12);
+            --hover-bg: rgba(15, 23, 42, 0.05);
+            --input-bg: rgba(255, 255, 255, 0.7);
+            --input-border: rgba(15, 23, 42, 0.14);
+            --placeholder: rgba(71, 85, 105, 0.55);
+            --aurora-opacity: 0.28;
+            --aurora-mid-opacity: 0.18;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--text);
+            position: relative;
+            overflow-x: hidden;
+            transition: background 0.25s ease, color 0.25s ease;
+        }
+
+        /* Aurora / mesh backdrop — matches the employee list page */
+        .aurora { position: fixed; inset: 0; z-index: 0; overflow: hidden; }
+        .aurora::before, .aurora::after {
+            content: "";
+            position: absolute;
+            width: 60vw; height: 60vw;
+            border-radius: 9999px;
+            filter: blur(110px);
+            opacity: var(--aurora-opacity);
+            animation: drift 22s ease-in-out infinite alternate;
+        }
+        .aurora::before {
+            top: -15%; left: -10%;
+            background: radial-gradient(circle at 30% 30%, #38bdf8, transparent 70%);
+        }
+        .aurora::after {
+            bottom: -20%; right: -10%;
+            background: radial-gradient(circle at 70% 70%, #a78bfa, transparent 70%);
+            animation-delay: -11s;
+        }
+        .aurora .mid {
+            position: absolute; top: 30%; left: 40%;
+            width: 45vw; height: 45vw;
+            border-radius: 9999px;
+            filter: blur(120px);
+            opacity: var(--aurora-mid-opacity);
+            background: radial-gradient(circle, #34d399, transparent 70%);
+            animation: drift 28s ease-in-out infinite alternate-reverse;
+        }
+        @keyframes drift {
+            0%   { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(4%, 6%) scale(1.08); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .aurora::before, .aurora::after, .aurora .mid { animation: none; }
+        }
+
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+        }
+        .glass-strong {
+            background: var(--glass-strong-bg);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--glass-strong-border);
+        }
+
+        .field-input {
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+            color: var(--text);
+            transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+        }
+        .field-input::placeholder { color: var(--placeholder); }
+        .field-input:focus {
+            outline: none;
+            border-color: rgba(56, 189, 248, 0.6);
+            background: var(--hover-bg);
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+        }
+        .field-input.field-invalid {
+            border-color: rgba(244, 63, 94, 0.6);
+            box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.12);
+        }
+        .field-error {
+            display: none;
+            align-items: center;
+            gap: 6px;
+            color: #f43f5e;
+            font-size: 12px;
+            margin-top: 6px;
+        }
+        .field-error.field-error-show { display: flex; }
+
+        .toast { transition: opacity 0.3s ease, transform 0.3s ease; }
+        .toast.toast-hide { opacity: 0; transform: translate(-50%, -12px); }
+    </style>
+</head>
+<body class="font-body">
+
+<div class="aurora"><span class="mid"></span></div>
+
+<!--
+  Optional: set redirectAttributes.addFlashAttribute("errorMessage", "...") in your
+  controller (e.g. on a duplicate-email save failure) to surface a banner here.
+-->
+<div th:if="${errorMessage} != null" id="toast-error" data-toast
+     class="toast fixed top-6 left-1/2 -translate-x-1/2 z-50 glass-strong rounded-xl px-4 py-3 flex items-center gap-3 shadow-2xl shadow-black/20 max-w-md w-[90%]" role="alert">
+    <i class="fa-solid fa-triangle-exclamation text-rose-400"></i>
+    <span class="text-sm" th:text="${errorMessage}"></span>
+    <button type="button" onclick="dismissToast('toast-error')" class="ml-auto shrink-0 text-[var(--muted)] hover:text-[var(--text)] transition-colors">
+        <i class="fa-solid fa-xmark text-xs"></i>
+    </button>
+</div>
+
+<main class="relative z-10 max-w-xl mx-auto px-6 py-10 md:py-16">
+
+    <!-- Header -->
+    <div class="flex items-center gap-4 mb-8">
+        <a th:href="@{/employees}"
+           class="w-10 h-10 shrink-0 inline-flex items-center justify-center rounded-xl glass text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--hover-bg)] transition-colors">
+            <i class="fa-solid fa-arrow-left text-sm"></i>
+        </a>
+        <div class="glass w-12 h-12 rounded-2xl flex items-center justify-center shrink-0">
+            <i th:class="${employee.id} != null ? 'fa-solid fa-user-pen text-sky-400 text-lg' : 'fa-solid fa-user-plus text-sky-400 text-lg'"></i>
+        </div>
+        <div class="flex-1">
+            <h1 class="font-display text-2xl md:text-3xl font-semibold tracking-tight"
+                th:text="${employee.id} != null ? 'Edit Employee' : 'Add Employee'"></h1>
+            <p class="text-sm text-[var(--muted)] mt-0.5"
+               th:text="${employee.id} != null ? 'Update this team member\'s details' : 'Add a new team member to the roster'"></p>
+        </div>
+        <button type="button" onclick="toggleTheme()" title="Toggle theme"
+                class="w-11 h-11 shrink-0 inline-flex items-center justify-center rounded-xl glass text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--hover-bg)] transition-colors">
+            <i id="theme-icon" class="fa-solid fa-sun text-sm"></i>
+        </button>
+    </div>
+
+    <!-- Form card -->
+    <div class="glass-strong rounded-2xl shadow-2xl shadow-black/20 p-6 md:p-8">
+        <form id="employee-form"
+              th:action="${employee.id} != null ? @{/employees/update/{id}(id=${employee.id})} : @{/employees}"
+              th:object="${employee}" method="post" class="space-y-5" novalidate>
+
+            <div>
+                <label for="name" class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1.5">
+                    <i class="fa-solid fa-user text-[11px]"></i>
+                    Name
+                </label>
+                <input type="text" id="name" th:field="*{name}" required placeholder="e.g. Jordan Lee"
+                       data-validate="name"
+                       class="field-input w-full rounded-lg px-3.5 py-2.5 text-sm" />
+                <p class="field-error" data-error-for="name">
+                    <i class="fa-solid fa-circle-exclamation text-[11px]"></i>
+                    <span>Enter a name.</span>
+                </p>
+            </div>
+
+            <div>
+                <label for="email" class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1.5">
+                    <i class="fa-regular fa-envelope text-[11px]"></i>
+                    Email
+                </label>
+                <input type="email" id="email" th:field="*{email}" required placeholder="name@company.com"
+                       data-validate="email"
+                       class="field-input w-full rounded-lg px-3.5 py-2.5 text-sm" />
+                <p class="field-error" data-error-for="email">
+                    <i class="fa-solid fa-circle-exclamation text-[11px]"></i>
+                    <span>Enter a valid email address.</span>
+                </p>
+            </div>
+
+            <div>
+                <label for="number" class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1.5">
+                    <i class="fa-solid fa-phone text-[11px]"></i>
+                    Number
+                </label>
+                <input type="text" id="number" th:field="*{number}" placeholder="e.g. +1 555 123 4567"
+                       data-validate="number"
+                       class="field-input w-full rounded-lg px-3.5 py-2.5 text-sm font-mono" />
+                <p class="field-error" data-error-for="number">
+                    <i class="fa-solid fa-circle-exclamation text-[11px]"></i>
+                    <span>Enter a valid phone number.</span>
+                </p>
+            </div>
+
+            <div>
+                <label for="salary" class="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-1.5">
+                    <i class="fa-solid fa-sack-dollar text-[11px]"></i>
+                    Salary
+                </label>
+                <input type="number" step="0.01" min="0" id="salary" th:field="*{salary}" placeholder="0.00"
+                       data-validate="salary"
+                       class="field-input w-full rounded-lg px-3.5 py-2.5 text-sm font-mono" />
+                <p class="field-error" data-error-for="salary">
+                    <i class="fa-solid fa-circle-exclamation text-[11px]"></i>
+                    <span>Salary can't be negative.</span>
+                </p>
+            </div>
+
+            <div class="flex items-center gap-3 pt-3">
+                <button type="submit"
+                        class="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 font-medium text-slate-950 bg-gradient-to-r from-sky-400 to-cyan-300 hover:from-sky-300 hover:to-cyan-200 transition-colors shadow-lg shadow-sky-500/20">
+                    <i class="fa-solid fa-check text-sm"></i>
+                    <span>Save</span>
+                </button>
+                <a th:href="@{/employees}"
+                   class="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 font-medium glass text-[var(--muted)] hover:bg-[var(--hover-bg)] hover:text-[var(--text)] transition-colors">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                    <span>Cancel</span>
+                </a>
+            </div>
+
+        </form>
+    </div>
+
+</main>
+
+<script>
+    function toggleTheme() {
+        var isLight = document.documentElement.classList.toggle('light');
+        localStorage.setItem('employee-theme', isLight ? 'light' : 'dark');
+        document.getElementById('theme-icon').className = isLight ? 'fa-solid fa-moon text-sm' : 'fa-solid fa-sun text-sm';
+    }
+    document.getElementById('theme-icon').className = document.documentElement.classList.contains('light')
+        ? 'fa-solid fa-moon text-sm' : 'fa-solid fa-sun text-sm';
+
+    function dismissToast(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.classList.add('toast-hide');
+        setTimeout(function () { el.remove(); }, 300);
+    }
+    document.querySelectorAll('[data-toast]').forEach(function (el) {
+        setTimeout(function () { dismissToast(el.id); }, 4000);
+    });
+
+    // Inline validation — shows an error message under the field instead of the
+    // browser's default validation bubble, and blocks submission until fixed.
+    (function () {
+        var form = document.getElementById('employee-form');
+        var emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        var phonePattern = /^[0-9+()\-.\s]{7,20}$/;
+
+        function setInvalid(input, isInvalid) {
+            var error = form.querySelector('[data-error-for="' + input.dataset.validate + '"]');
+            input.classList.toggle('field-invalid', isInvalid);
+            if (error) error.classList.toggle('field-error-show', isInvalid);
+        }
+
+        function validateField(input) {
+            var kind = input.dataset.validate;
+            var value = input.value.trim();
+            var invalid = false;
+
+            if (kind === 'name') {
+                invalid = value.length === 0;
+            } else if (kind === 'email') {
+                invalid = value.length === 0 || !emailPattern.test(value);
+            } else if (kind === 'number') {
+                invalid = value.length > 0 && !phonePattern.test(value);
+            } else if (kind === 'salary') {
+                invalid = value.length > 0 && parseFloat(value) < 0;
+            }
+
+            setInvalid(input, invalid);
+            return !invalid;
+        }
+
+        form.querySelectorAll('[data-validate]').forEach(function (input) {
+            input.addEventListener('blur', function () { validateField(input); });
+            input.addEventListener('input', function () {
+                if (input.classList.contains('field-invalid')) validateField(input);
+            });
+        });
+
+        form.addEventListener('submit', function (e) {
+            var allValid = true;
+            form.querySelectorAll('[data-validate]').forEach(function (input) {
+                if (!validateField(input)) allValid = false;
+            });
+            if (!allValid) {
+                e.preventDefault();
+                var firstInvalid = form.querySelector('.field-invalid');
+                if (firstInvalid) firstInvalid.focus();
+            }
+        });
+    })();
+</script>
+
+</body>
+</html>
