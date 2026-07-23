@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In &middot; Employee Management</title>
+
+    <!-- Apply saved theme before paint to avoid a flash of the wrong theme -->
+    <script>
+        (function () {
+            var saved = localStorage.getItem('employee-theme');
+            var prefersLight = window.matchMedia('(prefers-color-scheme: light)').matches;
+            if (saved === 'light' || (!saved && prefersLight)) {
+                document.documentElement.classList.add('light');
+            }
+        })();
+    </script>
+
+    <!-- Tailwind (JIT, no build step needed) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+    <!-- Typefaces: Space Grotesk for display, Inter for body, JetBrains Mono for tabular data -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        display: ['"Space Grotesk"', 'sans-serif'],
+                        body: ['Inter', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    <style>
+        :root {
+            --bg: #0b1020;
+            --text: #f1f5f9;
+            --muted: #94a3b8;
+            --glass-bg: rgba(255, 255, 255, 0.06);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --glass-strong-bg: rgba(255, 255, 255, 0.09);
+            --glass-strong-border: rgba(255, 255, 255, 0.16);
+            --hairline: rgba(255, 255, 255, 0.08);
+            --hover-bg: rgba(255, 255, 255, 0.10);
+            --input-bg: rgba(255, 255, 255, 0.05);
+            --input-border: rgba(255, 255, 255, 0.14);
+            --placeholder: rgba(148, 163, 184, 0.6);
+            --aurora-opacity: 0.55;
+            --aurora-mid-opacity: 0.35;
+        }
+        html.light {
+            --bg: #e9edf5;
+            --text: #0f172a;
+            --muted: #55617a;
+            --glass-bg: rgba(255, 255, 255, 0.55);
+            --glass-border: rgba(15, 23, 42, 0.10);
+            --glass-strong-bg: rgba(255, 255, 255, 0.72);
+            --glass-strong-border: rgba(15, 23, 42, 0.12);
+            --hairline: rgba(15, 23, 42, 0.08);
+            --hover-bg: rgba(15, 23, 42, 0.05);
+            --input-bg: rgba(255, 255, 255, 0.7);
+            --input-border: rgba(15, 23, 42, 0.14);
+            --placeholder: rgba(71, 85, 105, 0.55);
+            --aurora-opacity: 0.28;
+            --aurora-mid-opacity: 0.18;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--text);
+            position: relative;
+            overflow-x: hidden;
+            transition: background 0.25s ease, color 0.25s ease;
+        }
+
+        /* Aurora / mesh backdrop */
+        .aurora { position: fixed; inset: 0; z-index: 0; overflow: hidden; }
+        .aurora::before, .aurora::after {
+            content: "";
+            position: absolute;
+            width: 60vw; height: 60vw;
+            border-radius: 9999px;
+            filter: blur(110px);
+            opacity: var(--aurora-opacity);
+            animation: drift 22s ease-in-out infinite alternate;
+        }
+        .aurora::before {
+            top: -15%; left: -10%;
+            background: radial-gradient(circle at 30% 30%, #38bdf8, transparent 70%);
+        }
+        .aurora::after {
+            bottom: -20%; right: -10%;
+            background: radial-gradient(circle at 70% 70%, #a78bfa, transparent 70%);
+            animation-delay: -11s;
+        }
+        .aurora .mid {
+            position: absolute; top: 30%; left: 40%;
+            width: 45vw; height: 45vw;
+            border-radius: 9999px;
+            filter: blur(120px);
+            opacity: var(--aurora-mid-opacity);
+            background: radial-gradient(circle, #34d399, transparent 70%);
+            animation: drift 28s ease-in-out infinite alternate-reverse;
+        }
+        @keyframes drift {
+            0%   { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(4%, 6%) scale(1.08); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .aurora::before, .aurora::after, .aurora .mid { animation: none; }
+        }
+
+        .glass {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+        }
+        .glass-strong {
+            background: var(--glass-strong-bg);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--glass-strong-border);
+        }
+
+        .input-field {
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
+            color: var(--text);
+        }
+        .input-field::placeholder { color: var(--placeholder); }
+        .input-field:focus {
+            outline: none;
+            border-color: #38bdf8;
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
+        }
+
+        .toast { transition: opacity 0.3s ease, transform 0.3s ease; }
+        .toast.toast-hide { opacity: 0; transform: translate(-50%, -12px); }
+    </style>
+</head>
+<body class="font-body">
+
+<div class="aurora"><span class="mid"></span></div>
+
+<!-- Error / logout flash messages, styled the same as employee-list toasts -->
+<div th:if="${param.error != null}" id="toast-error" data-toast
+     class="toast fixed top-6 left-1/2 -translate-x-1/2 z-50 glass-strong rounded-xl px-4 py-3 flex items-center gap-3 shadow-2xl shadow-black/20 max-w-md w-[90%]" role="alert">
+    <i class="fa-solid fa-triangle-exclamation text-rose-400"></i>
+    <span class="text-sm">Invalid username or password.</span>
+    <button type="button" onclick="dismissToast('toast-error')" class="ml-auto shrink-0 text-[var(--muted)] hover:text-[var(--text)] transition-colors">
+        <i class="fa-solid fa-xmark text-xs"></i>
+    </button>
+</div>
+<div th:if="${param.logout != null}" id="toast-success" data-toast
+     class="toast fixed top-6 left-1/2 -translate-x-1/2 z-50 glass-strong rounded-xl px-4 py-3 flex items-center gap-3 shadow-2xl shadow-black/20 max-w-md w-[90%]" role="status">
+    <i class="fa-solid fa-circle-check text-emerald-400"></i>
+    <span class="text-sm">You've been signed out.</span>
+    <button type="button" onclick="dismissToast('toast-success')" class="ml-auto shrink-0 text-[var(--muted)] hover:text-[var(--text)] transition-colors">
+        <i class="fa-solid fa-xmark text-xs"></i>
+    </button>
+</div>
+
+<main class="relative z-10 min-h-screen flex items-center justify-center px-6 py-10">
+    <div class="w-full max-w-md">
+
+        <!-- Theme toggle, top-right of the card -->
+        <div class="flex justify-end mb-4">
+            <button type="button" onclick="toggleTheme()" title="Toggle theme"
+                    class="w-11 h-11 shrink-0 inline-flex items-center justify-center rounded-xl glass text-[var(--muted)] hover:text-[var(--text)] hover:bg-[var(--hover-bg)] transition-colors">
+                <i id="theme-icon" class="fa-solid fa-sun text-sm"></i>
+            </button>
+        </div>
+
+        <div class="glass-strong rounded-2xl shadow-2xl shadow-black/20 p-8 md:p-10">
+
+            <div class="flex flex-col items-center text-center mb-8">
+                <div class="glass w-14 h-14 rounded-2xl flex items-center justify-center mb-4">
+                    <i class="fa-solid fa-users text-sky-400 text-xl"></i>
+                </div>
+                <h1 class="font-display text-2xl md:text-3xl font-semibold tracking-tight">Welcome back</h1>
+                <p class="text-sm text-[var(--muted)] mt-1">Sign in to manage your team's records</p>
+            </div>
+
+            <form th:action="@{/login}" method="post" class="space-y-5">
+
+                <div>
+                    <label for="username" class="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-2">Username</label>
+                    <div class="relative">
+                        <i class="fa-regular fa-user absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted)] text-sm"></i>
+                        <input type="text" id="username" name="username" required autofocus
+                               placeholder="Enter your username"
+                               class="input-field w-full rounded-xl pl-11 pr-4 py-3 text-sm transition-colors">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="password" class="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-2">Password</label>
+                    <div class="relative">
+                        <i class="fa-solid fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted)] text-sm"></i>
+                        <input type="password" id="password" name="password" required
+                               placeholder="Enter your password"
+                               class="input-field w-full rounded-xl pl-11 pr-4 py-3 text-sm transition-colors">
+                    </div>
+                </div>
+
+                <button type="submit"
+                        class="w-full inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 font-medium text-slate-950 bg-gradient-to-r from-sky-400 to-cyan-300 hover:from-sky-300 hover:to-cyan-200 transition-colors shadow-lg shadow-sky-500/20">
+                    <i class="fa-solid fa-right-to-bracket text-sm"></i>
+                    <span>Sign In</span>
+                </button>
+            </form>
+        </div>
+
+    </div>
+</main>
+
+<script>
+    function toggleTheme() {
+        var isLight = document.documentElement.classList.toggle('light');
+        localStorage.setItem('employee-theme', isLight ? 'light' : 'dark');
+        document.getElementById('theme-icon').className = isLight ? 'fa-solid fa-moon text-sm' : 'fa-solid fa-sun text-sm';
+    }
+    document.getElementById('theme-icon').className = document.documentElement.classList.contains('light')
+        ? 'fa-solid fa-moon text-sm' : 'fa-solid fa-sun text-sm';
+
+    function dismissToast(id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.classList.add('toast-hide');
+        setTimeout(function () { el.remove(); }, 300);
+    }
+    document.querySelectorAll('[data-toast]').forEach(function (el) {
+        setTimeout(function () { dismissToast(el.id); }, 4000);
+    });
+</script>
+</body>
+</html>

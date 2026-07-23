@@ -10,4 +10,8 @@ public class HomeController {
     public String redirectToEmployees() {
         return "redirect:/employees";
     }
+    @GetMapping("/login")
+    public String login() {
+        return "login";
+    }
 }
