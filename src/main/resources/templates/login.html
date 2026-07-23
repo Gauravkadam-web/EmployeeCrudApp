@@ -147,6 +147,44 @@
 
         .toast { transition: opacity 0.3s ease, transform 0.3s ease; }
         .toast.toast-hide { opacity: 0; transform: translate(-50%, -12px); }
+
+        /* Password show/hide toggle button */
+        .pw-toggle {
+            color: var(--muted);
+            transition: color 0.15s ease;
+        }
+        .pw-toggle:hover { color: var(--text); }
+
+        /* Submit button loading state */
+        #submit-btn[data-loading="true"] .btn-label,
+        #submit-btn[data-loading="true"] .btn-icon {
+            opacity: 0;
+        }
+        #submit-btn[data-loading="true"] .btn-spinner {
+            opacity: 1;
+        }
+        .btn-label, .btn-icon, .btn-spinner {
+            transition: opacity 0.15s ease;
+        }
+        .btn-spinner {
+            opacity: 0;
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .spinner {
+            width: 18px;
+            height: 18px;
+            border: 2.5px solid rgba(2, 6, 23, 0.25);
+            border-top-color: #020617;
+            border-radius: 9999px;
+            animation: spin 0.7s linear infinite;
+        }
     </style>
 </head>
 <body class="font-body">
@@ -192,7 +230,7 @@
                 <p class="text-sm text-[var(--muted)] mt-1">Sign in to manage your team's records</p>
             </div>
 
-            <form th:action="@{/login}" method="post" class="space-y-5">
+            <form th:action="@{/login}" method="post" class="space-y-5" id="login-form">
 
                 <div>
                     <label for="username" class="block text-xs font-semibold uppercase tracking-wider text-[var(--muted)] mb-2">Username</label>
@@ -210,14 +248,20 @@
                         <i class="fa-solid fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted)] text-sm"></i>
                         <input type="password" id="password" name="password" required
                                placeholder="Enter your password"
-                               class="input-field w-full rounded-xl pl-11 pr-4 py-3 text-sm transition-colors">
+                               class="input-field w-full rounded-xl pl-11 pr-11 py-3 text-sm transition-colors">
+                        <button type="button" id="pw-toggle-btn" onclick="togglePassword()"
+                                aria-label="Show password" aria-pressed="false"
+                                class="pw-toggle absolute right-4 top-1/2 -translate-y-1/2 text-sm">
+                            <i id="pw-toggle-icon" class="fa-regular fa-eye"></i>
+                        </button>
                     </div>
                 </div>
 
-                <button type="submit"
-                        class="w-full inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 font-medium text-slate-950 bg-gradient-to-r from-sky-400 to-cyan-300 hover:from-sky-300 hover:to-cyan-200 transition-colors shadow-lg shadow-sky-500/20">
-                    <i class="fa-solid fa-right-to-bracket text-sm"></i>
-                    <span>Sign In</span>
+                <button type="submit" id="submit-btn"
+                        class="relative w-full inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 font-medium text-slate-950 bg-gradient-to-r from-sky-400 to-cyan-300 hover:from-sky-300 hover:to-cyan-200 transition-colors shadow-lg shadow-sky-500/20 disabled:cursor-not-allowed">
+                    <i class="btn-icon fa-solid fa-right-to-bracket text-sm"></i>
+                    <span class="btn-label">Sign In</span>
+                    <span class="btn-spinner"><span class="spinner"></span></span>
                 </button>
             </form>
         </div>
@@ -242,6 +286,58 @@
     }
     document.querySelectorAll('[data-toast]').forEach(function (el) {
         setTimeout(function () { dismissToast(el.id); }, 4000);
+    });
+
+    // Show / hide password toggle
+    function togglePassword() {
+        var input = document.getElementById('password');
+        var icon = document.getElementById('pw-toggle-icon');
+        var btn = document.getElementById('pw-toggle-btn');
+        var isHidden = input.type === 'password';
+        input.type = isHidden ? 'text' : 'password';
+        icon.className = isHidden ? 'fa-regular fa-eye-slash' : 'fa-regular fa-eye';
+        btn.setAttribute('aria-label', isHidden ? 'Hide password' : 'Show password');
+        btn.setAttribute('aria-pressed', isHidden ? 'true' : 'false');
+    }
+
+    // Loading spinner on submit
+    var submitBtn = document.getElementById('submit-btn');
+
+    function setLoading(isLoading) {
+        if (isLoading) {
+            submitBtn.setAttribute('data-loading', 'true');
+            submitBtn.disabled = true;
+        } else {
+            submitBtn.removeAttribute('data-loading');
+            submitBtn.disabled = false;
+        }
+    }
+
+    document.getElementById('login-form').addEventListener('submit', function () {
+        setLoading(true);
+    });
+
+    // Safety net: this is a real form POST, so the page normally reloads
+    // (success -> new page, failure -> this page with ?error, both clear the spinner naturally).
+    // But if the browser restores this page from back/forward cache (bfcache) after
+    // a failed navigation, or if this form is ever swapped for an AJAX submit later,
+    // the button could get stuck showing the spinner. These two guards reset it:
+
+    // 1) Reset on bfcache restore (e.g. user hits "back" after a failed login).
+    window.addEventListener('pageshow', function (event) {
+        if (event.persisted) {
+            setLoading(false);
+        }
+    });
+
+    // 2) Fallback timeout in case a submit never results in navigation
+    // (e.g. network error, or a future fetch()-based submit that forgets to reset state).
+    var loadingTimeout = null;
+    document.getElementById('login-form').addEventListener('submit', function () {
+        loadingTimeout = setTimeout(function () { setLoading(false); }, 8000);
+    });
+    window.addEventListener('beforeunload', function () {
+        if (loadingTimeout) clearTimeout(loadingTimeout);
     });
 </script>
 </body>
